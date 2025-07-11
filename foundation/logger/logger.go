@@ -6,15 +6,19 @@ import (
 )
 
 type Logger struct {
-	Level           Level
-	Handlers        []Handler
-	Fields          []Field
-	Hooks           []Hook
-	ctx             context.Context
-	dispatcher      *Dispatcher
-	onceBuildInfo   []Field
-	onceRuntimeInfo []Field
-	traceIdKey      string
+	Level                Level
+	Handlers             []Handler
+	Fields               []Field
+	Hooks                []Hook
+	ctx                  context.Context
+	dispatcher           *Dispatcher
+	onceBuildInfo        []Field
+	onceRuntimeInfo      []Field
+	traceIdKey           string
+	bufferSize           int
+	backpressure         BackpressureStrategy
+	numWorkers           int
+	internalErrorHandler func(error)
 }
 
 func NewLogger(opts ...Option) *Logger {
@@ -25,7 +29,7 @@ func NewLogger(opts ...Option) *Logger {
 		o(l)
 	}
 
-	l.dispatcher = NewDispatcher(l.Handlers, l.Hooks)
+	l.dispatcher = NewDispatcher(l.Handlers, l.Hooks, l.numWorkers, l.bufferSize, l.backpressure, l.internalErrorHandler)
 
 	if len(l.onceBuildInfo) > 0 {
 		l.Info("build information", l.onceBuildInfo...)

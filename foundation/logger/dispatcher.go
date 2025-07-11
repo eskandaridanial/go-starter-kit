@@ -3,17 +3,32 @@ package logger
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
-var defaultBufferSize = 1000
+type BackpressureStrategy int
+
+const (
+	Drop BackpressureStrategy = iota
+	Block
+)
 
 type Dispatcher struct {
-	records  chan dispatchEntry
-	wg       sync.WaitGroup
-	handlers []Handler
-	hooks    []Hook
+	records             chan dispatchEntry
+	wg                  sync.WaitGroup
+	handlers            []Handler
+	hooks               []Hook
+	numWorkers          int
+	backpressure        BackpressureStrategy
+	bufferSize          int
+	dropNoticeThreshold int64
+
+	internalErrorHandler func(error)
+
+	droppedLogsCount int64
 }
 
 type dispatchEntry struct {
@@ -21,22 +36,55 @@ type dispatchEntry struct {
 	rec Record
 }
 
-func NewDispatcher(handlers []Handler, hooks []Hook) *Dispatcher {
-	d := &Dispatcher{
-		records:  make(chan dispatchEntry, defaultBufferSize),
-		handlers: handlers,
-		hooks:    hooks,
+func NewDispatcher(
+	handlers []Handler,
+	hooks []Hook,
+	numWorkers int,
+	bufferSize int,
+	backpressure BackpressureStrategy,
+	internalErrorHandler func(error),
+) *Dispatcher {
+	if numWorkers <= 0 {
+		numWorkers = 1
 	}
-	d.wg.Add(1)
-	go d.run()
+	if bufferSize <= 0 {
+		bufferSize = 1000
+	}
+
+	d := &Dispatcher{
+		records:              make(chan dispatchEntry, bufferSize),
+		handlers:             handlers,
+		hooks:                hooks,
+		numWorkers:           numWorkers,
+		backpressure:         backpressure,
+		bufferSize:           bufferSize,
+		dropNoticeThreshold:  1000,
+		internalErrorHandler: internalErrorHandler,
+	}
+
+	for i := 0; i < numWorkers; i++ {
+		d.wg.Add(1)
+		go d.run()
+	}
+
 	return d
 }
 
 func (d *Dispatcher) Dispatch(ctx context.Context, rec Record) {
-	select {
-	case d.records <- dispatchEntry{ctx: ctx, rec: rec}:
-	default:
-		fmt.Printf("logger: dropped log due to full queue: %s", rec.Message)
+	entry := dispatchEntry{ctx: ctx, rec: rec}
+
+	switch d.backpressure {
+	case Drop:
+		select {
+		case d.records <- entry:
+		default:
+			atomic.AddInt64(&d.droppedLogsCount, 1)
+			if d.DroppedCount()%d.dropNoticeThreshold == 0 {
+				d.reportInternalError(fmt.Errorf("dropped %d logs due to full queue", d.DroppedCount()))
+			}
+		}
+	case Block:
+		d.records <- entry
 	}
 }
 
@@ -66,7 +114,6 @@ func (d *Dispatcher) deliver(ctx context.Context, rec Record) {
 	for _, hook := range d.hooks {
 		func() {
 			defer d.recover()
-			hook.OnAll(ctx, rec)
 			switch rec.Level {
 			case Debug:
 				hook.OnDebug(ctx, rec)
@@ -83,6 +130,26 @@ func (d *Dispatcher) deliver(ctx context.Context, rec Record) {
 
 func (d *Dispatcher) recover() {
 	if r := recover(); r != nil {
-		fmt.Printf("logger: recovered from panic: %v", r)
+		d.reportInternalError(fmt.Errorf("recovered from panic in handler/hook: %v", r))
 	}
+}
+
+func (d *Dispatcher) DroppedCount() int64 {
+	return atomic.LoadInt64(&d.droppedLogsCount)
+}
+
+func (d *Dispatcher) BufferSize() int {
+	return d.bufferSize
+}
+
+func (d *Dispatcher) reportInternalError(err error) {
+	if d.internalErrorHandler != nil {
+		d.internalErrorHandler(err)
+	} else {
+		internalLog("%v", err)
+	}
+}
+
+func internalLog(format string, args ...any) {
+	fmt.Fprintf(os.Stderr, "logger [internal]: "+format+"\n", args...)
 }

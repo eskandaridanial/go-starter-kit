@@ -89,3 +89,27 @@ func WithTraceIdKey(traceIdKey string) Option {
 		l.traceIdKey = traceIdKey
 	}
 }
+
+func WithBufferSize(size int) Option {
+	return func(l *Logger) {
+		l.bufferSize = size
+	}
+}
+
+func WithBackpressure(strategy BackpressureStrategy) Option {
+	return func(l *Logger) {
+		l.backpressure = strategy
+	}
+}
+
+func WithWorkers(n int) Option {
+	return func(l *Logger) {
+		l.numWorkers = n
+	}
+}
+
+func WithInternalErrorHandler(f func(error)) Option {
+	return func(l *Logger) {
+		l.internalErrorHandler = f
+	}
+}
