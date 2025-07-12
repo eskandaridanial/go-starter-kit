@@ -9,33 +9,40 @@ import (
 	"time"
 )
 
+// type 'BackpressureStrategy' represents a backpressure strategy
 type BackpressureStrategy int
 
+// constants 'Drop' and 'Block' are backpressure strategies,
+// 'Drop' drops logs when the buffer is full(may cause data loss),
+// 'Block' blocks until the buffer is not full(may cause performance issues)
 const (
 	Drop BackpressureStrategy = iota
 	Block
 )
 
+// struct 'Dispatcher' represents a logging dispatcher,
+// it is responsible for dispatching logs to handlers and hooks
 type Dispatcher struct {
-	records             chan dispatchEntry
-	wg                  sync.WaitGroup
-	handlers            []Handler
-	hooks               []Hook
-	numWorkers          int
-	backpressure        BackpressureStrategy
-	bufferSize          int
-	dropNoticeThreshold int64
-
+	records              chan dispatchEntry
+	wg                   sync.WaitGroup
+	handlers             []Handler
+	hooks                []Hook
+	numWorkers           int
+	backpressure         BackpressureStrategy
+	bufferSize           int
 	internalErrorHandler func(error)
-
-	droppedLogsCount int64
+	dropNoticeThreshold  int64
+	droppedLogsCount     int64
 }
 
+// struct 'dispatchEntry' represents a dispatch entry,
+// it contains a context and a structured logging record
 type dispatchEntry struct {
 	ctx context.Context
 	rec Record
 }
 
+// function 'NewDispatcher' creates a new dispatcher instance
 func NewDispatcher(
 	handlers []Handler,
 	hooks []Hook,
@@ -70,6 +77,7 @@ func NewDispatcher(
 	return d
 }
 
+// function 'Dispatch' dispatches a structured logging record to the dispatcher
 func (d *Dispatcher) Dispatch(ctx context.Context, rec Record) {
 	entry := dispatchEntry{ctx: ctx, rec: rec}
 
@@ -100,6 +108,7 @@ func (d *Dispatcher) run() {
 	}
 }
 
+// function 'deliver' delivers a structured logging record to the handlers and hooks
 func (d *Dispatcher) deliver(ctx context.Context, rec Record) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -128,20 +137,26 @@ func (d *Dispatcher) deliver(ctx context.Context, rec Record) {
 	}
 }
 
+// function 'recover' recovers from a panic in a handler or hook
 func (d *Dispatcher) recover() {
 	if r := recover(); r != nil {
 		d.reportInternalError(fmt.Errorf("recovered from panic in handler/hook: %v", r))
 	}
 }
 
+// function 'DroppedCount' returns the number of dropped logs
 func (d *Dispatcher) DroppedCount() int64 {
 	return atomic.LoadInt64(&d.droppedLogsCount)
 }
 
+// function 'BufferSize' returns the buffer size,
+// choosing a buffer size that is too small may cause logs to be dropped,
+// choosing a buffer size that is too large may cause performance issues
 func (d *Dispatcher) BufferSize() int {
 	return d.bufferSize
 }
 
+// function 'reportInternalError' reports an internal error
 func (d *Dispatcher) reportInternalError(err error) {
 	if d.internalErrorHandler != nil {
 		d.internalErrorHandler(err)
@@ -150,6 +165,7 @@ func (d *Dispatcher) reportInternalError(err error) {
 	}
 }
 
+// function 'internalLog' logs an internal error
 func internalLog(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, "logger [internal]: "+format+"\n", args...)
 }

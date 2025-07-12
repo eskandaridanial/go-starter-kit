@@ -9,22 +9,28 @@ import (
 	"time"
 )
 
+// variable 'bufPool' is a pool of bytes buffers to reduce allocations
 var bufPool = sync.Pool{
 	New: func() any {
 		return new(bytes.Buffer)
 	},
 }
 
+// type 'Formatter' represents a logging formatter,
+// concrete implementations are 'JSONFormatter' and 'TextFormatter'
 type Formatter interface {
 	Format(r Record) []byte
 }
 
+// struct 'JSONFormatter' implements 'Formatter' interface
 type JSONFormatter struct{}
 
+// function 'NewJSONFormatter' creates a new 'JSONFormatter'
 func NewJSONFormatter() *JSONFormatter {
 	return &JSONFormatter{}
 }
 
+// function 'Format' formats the given record as JSON
 func (f *JSONFormatter) Format(r Record) []byte {
 	buf := bufPool.Get().(*bytes.Buffer)
 	buf.Reset()
@@ -46,12 +52,15 @@ func (f *JSONFormatter) Format(r Record) []byte {
 	return buf.Bytes()
 }
 
+// const 'DefaultPattern' is the default pattern for text formatter
 const DefaultPattern = "{{.timestamp}} [{{.level}}] {{.caller}} {{.message}} - [{{.fields}}]"
 
+// struct 'TextFormatter' implements 'Formatter' interface
 type TextFormatter struct {
 	tmpl *template.Template
 }
 
+// function 'NewTextFormatter' creates a new 'TextFormatter'
 func NewTextFormatter(pattern string) *TextFormatter {
 	if pattern == "" {
 		pattern = DefaultPattern
@@ -60,6 +69,7 @@ func NewTextFormatter(pattern string) *TextFormatter {
 	return &TextFormatter{tmpl: tmpl}
 }
 
+// function 'Format' formats the given record as text
 func (f *TextFormatter) Format(r Record) []byte {
 	buf := bufPool.Get().(*bytes.Buffer)
 	buf.Reset()

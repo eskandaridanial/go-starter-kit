@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+// type 'Logger' represents a message that contains properties required for structured logging
 type Logger struct {
 	Level                Level
 	Handlers             []Handler
@@ -21,6 +22,7 @@ type Logger struct {
 	internalErrorHandler func(error)
 }
 
+// function 'NewLogger' creates a new logger instance with the given options
 func NewLogger(opts ...Option) *Logger {
 	l := &Logger{
 		Level: Info,
@@ -44,6 +46,8 @@ func NewLogger(opts ...Option) *Logger {
 	return l
 }
 
+// function 'WithField' creates a new logger instance with the given field added to the logger
+// it is used after 'Logger' is initialized to add additional fields to the logger
 func (l *Logger) WithField(field Field) *Logger {
 	newFields := make([]Field, len(l.Fields)+1)
 	copy(newFields, l.Fields)
@@ -59,6 +63,8 @@ func (l *Logger) WithField(field Field) *Logger {
 	}
 }
 
+// function 'log' logs a message with the given level and fields
+// it is used by 'Debug', 'Info', 'Warn', 'Error' methods
 func (l *Logger) log(ctx context.Context, level Level, msg string, fields []Field) {
 	if level < l.Level {
 		return
@@ -89,38 +95,47 @@ func (l *Logger) log(ctx context.Context, level Level, msg string, fields []Fiel
 	l.dispatcher.Dispatch(workingCtx, rec)
 }
 
+// function 'Debug' logs a debug message with the given fields
 func (l *Logger) Debug(msg string, fields ...Field) {
 	l.log(context.Background(), Debug, msg, fields)
 }
 
+// function 'Info' logs an info message with the given fields
 func (l *Logger) Info(msg string, fields ...Field) {
 	l.log(context.Background(), Info, msg, fields)
 }
 
+// function 'Warn' logs a warning message with the given fields
 func (l *Logger) Warn(msg string, fields ...Field) {
 	l.log(context.Background(), Warn, msg, fields)
 }
 
+// function 'Error' logs an error message with the given fields
 func (l *Logger) Error(msg string, fields ...Field) {
 	l.log(context.Background(), Error, msg, fields)
 }
 
+// function 'DebugCtx' logs a debug message with the given fields and context
 func (l *Logger) DebugCtx(ctx context.Context, msg string, fields ...Field) {
 	l.log(ctx, Debug, msg, fields)
 }
 
+// function 'InfoCtx' logs an info message with the given fields and context
 func (l *Logger) InfoCtx(ctx context.Context, msg string, fields ...Field) {
 	l.log(ctx, Info, msg, fields)
 }
 
+// function 'WarnCtx' logs a warning message with the given fields and context
 func (l *Logger) WarnCtx(ctx context.Context, msg string, fields ...Field) {
 	l.log(ctx, Warn, msg, fields)
 }
 
+// function 'ErrorCtx' logs an error message with the given fields and context
 func (l *Logger) ErrorCtx(ctx context.Context, msg string, fields ...Field) {
 	l.log(ctx, Error, msg, fields)
 }
 
+// function 'Close' closes the logger and releases all resources
 func (l *Logger) Close() {
 	l.dispatcher.Close()
 }

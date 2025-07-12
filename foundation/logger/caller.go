@@ -5,6 +5,7 @@ import (
 	"runtime"
 )
 
+// function 'caller' returns the caller's file and line number
 func caller(skip int) string {
 	_, file, line, ok := runtime.Caller(skip)
 	if !ok {

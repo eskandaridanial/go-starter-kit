@@ -4,6 +4,7 @@ import (
 	"runtime"
 )
 
+// type 'RuntimeInfo' represents the runtime information of the system
 type RuntimeInfo struct {
 	GoVersion    string
 	GoMaxProcs   int
@@ -11,6 +12,7 @@ type RuntimeInfo struct {
 	NumGoroutine int
 }
 
+// function 'NewRuntimeInfo' returns a new instance of 'RuntimeInfo' with the current runtime information
 func NewRuntimeInfo() RuntimeInfo {
 	return RuntimeInfo{
 		GoVersion:    runtime.Version(),
@@ -20,6 +22,7 @@ func NewRuntimeInfo() RuntimeInfo {
 	}
 }
 
+// function 'Fields' returns the runtime information as a slice of 'Field' for logging
 func (r RuntimeInfo) Fields() []Field {
 	return []Field{
 		{"go_version", r.GoVersion},
